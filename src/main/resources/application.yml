@@ -16,5 +16,17 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
+watchlist:
+  search:
+    field-weights:
+      korean-name: 30
+      english-name: 25
+      date-of-birth: 15
+      country: 8
+      residence: 8
+      aka: 8
+      gender: 3
+      listing-reason: 3
+
 server:
   port: 8080
