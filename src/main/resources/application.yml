@@ -19,6 +19,8 @@ mybatis:
 watchlist:
   search:
     index-path: ${WATCHLIST_INDEX_PATH:./data/lucene/watchlist}
+    high-risk-threshold: 90
+    review-threshold: 70
     field-weights:
       korean-name: 30
       english-name: 25

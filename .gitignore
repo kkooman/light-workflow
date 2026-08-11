@@ -33,3 +33,5 @@ data/
 .idea/
 *.iml
 .vscode/
+
+build/

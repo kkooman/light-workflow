@@ -2,6 +2,7 @@ package com.kkooman.lightworkflow.watchlist.service;
 
 import com.kkooman.lightworkflow.watchlist.api.WatchlistSearchRequest;
 import com.kkooman.lightworkflow.watchlist.api.WatchlistSearchResult;
+import com.kkooman.lightworkflow.watchlist.api.WatchlistRiskLevel;
 import com.kkooman.lightworkflow.watchlist.config.WatchlistSearchProperties;
 import com.kkooman.lightworkflow.watchlist.domain.WatchlistEntry;
 import java.io.IOException;
@@ -36,9 +37,12 @@ import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class WatchlistSearchService {
+    private static final Logger log = LoggerFactory.getLogger(WatchlistSearchService.class);
     private static final List<String> FIELDS = List.of(
             "korean-name", "english-name", "date-of-birth", "country",
             "residence", "aka", "gender", "listing-reason");
@@ -128,16 +132,69 @@ public class WatchlistSearchService {
                     String id = searcher.storedFields().document(hit.doc).get("id");
                     WatchlistEntry entry = entries.get(id);
                     if (entry != null) {
-                        results.add(new WatchlistSearchResult(entry, Math.min(100, hit.score / highestScore * 100)));
+                        double score = Math.min(100, hit.score / highestScore * 100);
+                        results.add(new WatchlistSearchResult(
+                                entry, score, riskLevel(score), matchedFields(request, entry)));
                     }
                 }
             }
+            log.info("Watchlist search completed: requestedFields={}, candidateCount={}",
+                    requestedFieldCount(request), results.size());
             return results.stream()
                     .sorted(Comparator.comparingDouble((WatchlistSearchResult result) -> result.score()).reversed())
                     .toList();
         } catch (IOException exception) {
             throw new IllegalStateException("Watchlist search failed", exception);
         }
+    }
+
+    private String riskLevel(double score) {
+            if (score >= properties.getHighRiskThreshold()) {
+                return WatchlistRiskLevel.HIGH.name();
+            }
+            if (score >= properties.getReviewThreshold()) {
+                return WatchlistRiskLevel.REVIEW.name();
+            }
+            return WatchlistRiskLevel.LOW.name();
+        }
+
+    private List<String> matchedFields(WatchlistSearchRequest request, WatchlistEntry entry) {
+            List<String> matched = new ArrayList<>();
+            List<String> queries = request.values();
+            List<String> values = List.of(
+                    entry.koreanName(), entry.englishName(), entry.dateOfBirth(), entry.country(),
+                    entry.residence(), String.join(" ", entry.aka()), entry.gender(), entry.listingReason());
+            for (int index = 0; index < FIELDS.size(); index++) {
+                String query = normalize(queries.get(index));
+                String value = normalize(values.get(index) == null ? "" : values.get(index));
+                if (!query.isBlank() && (value.contains(query) || query.contains(value)
+                        || (ANALYZED_FIELDS.contains(FIELDS.get(index)) && editDistance(query, value) <= 2))) {
+                    matched.add(FIELDS.get(index));
+                }
+            }
+            return List.copyOf(matched);
+        }
+
+    private long requestedFieldCount(WatchlistSearchRequest request) {
+            return request.values().stream().filter(value -> !value.isBlank()).count();
+    }
+
+    private int editDistance(String left, String right) {
+            int[] previous = new int[right.length() + 1];
+            for (int column = 0; column <= right.length(); column++) {
+                previous[column] = column;
+            }
+            for (int row = 1; row <= left.length(); row++) {
+                int[] current = new int[right.length() + 1];
+                current[0] = row;
+                for (int column = 1; column <= right.length(); column++) {
+                    current[column] = Math.min(
+                            Math.min(current[column - 1] + 1, previous[column] + 1),
+                            previous[column - 1] + (left.charAt(row - 1) == right.charAt(column - 1) ? 0 : 1));
+                }
+                previous = current;
+            }
+            return previous[right.length()];
     }
 
     private Query buildQuery(WatchlistSearchRequest request) {

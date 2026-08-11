@@ -61,3 +61,8 @@ curl -X POST http://localhost:8080/api/watchlist/search \
 해당 검색 결과 중 최고 점수를 100점으로 정규화합니다. 이름·AKA·등재 사유는
 다국어 분석과 오타 허용 검색을 사용하고, 생년월일·국가·거주지·성별은
 정확값을 기준으로 검색합니다.
+
+검색 결과에는 `matchedFields`와 `riskLevel`이 함께 반환됩니다. 위험등급은
+`watchlist.search.high-risk-threshold` 이상이면 `HIGH`, `review-threshold`
+이상이면 `REVIEW`, 그 미만이면 `LOW`입니다. 검색 실행 시 요청 필드 수와
+후보 수만 감사 로그로 기록하며, 개인정보인 검색어 원문은 로그에 남기지 않습니다.

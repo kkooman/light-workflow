@@ -76,6 +76,8 @@ class WatchlistSearchServiceTest {
 
         assertThat(results).extracting(result -> result.entry().id()).contains("wl-1");
         assertThat(results.getFirst().score()).isBetween(0D, 100D);
+        assertThat(results.getFirst().riskLevel()).isEqualTo("HIGH");
+        assertThat(results.getFirst().matchedFields()).contains("korean-name");
     }
 
     @Test
@@ -109,6 +111,8 @@ class WatchlistSearchServiceTest {
         assertThat(results.getFirst().entry().id()).isEqualTo("wl-1");
         assertThat(results.getFirst().score()).isEqualTo(100D);
         assertThat(results).allMatch(result -> result.score() >= 0 && result.score() <= 100);
+        assertThat(results.getFirst().riskLevel()).isEqualTo("HIGH");
+        assertThat(results.getFirst().matchedFields()).containsExactly("date-of-birth", "country");
     }
 
     @Test
@@ -196,5 +200,21 @@ class WatchlistSearchServiceTest {
     @Test
     void returnsNoResultsForEmptyRequest() {
         assertThat(service.search(new WatchlistSearchRequest(null, null, null, null, null, null, null, null))).isEmpty();
+    }
+
+    @Test
+    void classifiesIntermediateScoresAsReviewAndLowScoresAsLow() {
+        WatchlistSearchProperties properties = new WatchlistSearchProperties();
+        properties.setIndexPath("build/test-index/" + System.nanoTime());
+        properties.setHighRiskThreshold(101);
+        properties.setReviewThreshold(99);
+        WatchlistSearchService thresholdService = new WatchlistSearchService(properties, store);
+
+        thresholdService.upsert(new WatchlistEntry(
+                "wl-3", "이순신", "Lee Soon Shin", "1545-04-28",
+                "KR", "대한민국", List.of(), "M", "역사"));
+        var results = thresholdService.search(new WatchlistSearchRequest("이순신", null, null, null, null, null, null, null));
+
+        assertThat(results.getFirst().riskLevel()).isEqualTo("REVIEW");
     }
 }
