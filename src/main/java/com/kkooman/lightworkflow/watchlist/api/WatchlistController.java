@@ -43,4 +43,14 @@ public class WatchlistController {
     public ResponseEntity<Integer> rebuild() {
         return ResponseEntity.ok(searchService.rebuild());
     }
+
+    @PostMapping("/sync")
+    public ResponseEntity<Integer> sync(@RequestBody WatchlistSyncRequest request) {
+        return ResponseEntity.ok(searchService.sync(request.ids()));
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/index/status")
+    public WatchlistIndexStatus indexStatus() {
+        return searchService.status();
+    }
 }

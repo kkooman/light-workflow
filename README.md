@@ -66,3 +66,15 @@ curl -X POST http://localhost:8080/api/watchlist/search \
 `watchlist.search.high-risk-threshold` 이상이면 `HIGH`, `review-threshold`
 이상이면 `REVIEW`, 그 미만이면 `LOW`입니다. 검색 실행 시 요청 필드 수와
 후보 수만 감사 로그로 기록하며, 개인정보인 검색어 원문은 로그에 남기지 않습니다.
+
+운영 API:
+
+```text
+POST /api/watchlist/sync       # 변경된 ID만 DB에서 조회해 증분 색인
+GET  /api/watchlist/index/status
+```
+
+검색 감사 기록은 `watchlist_search_audit` 테이블에 저장하도록 구성되어
+있습니다. 실제 DB에 해당 테이블을 생성하고, `WatchlistAuditMapper.xml`의
+SQL을 운영 스키마에 맞춰 적용해야 합니다. 감사 테이블에는 검색어 원문 대신
+SHA-256 해시만 저장합니다.

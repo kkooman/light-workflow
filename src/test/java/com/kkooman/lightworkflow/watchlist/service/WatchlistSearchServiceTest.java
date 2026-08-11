@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import com.kkooman.lightworkflow.watchlist.repository.WatchlistEntryStore;
+import com.kkooman.lightworkflow.watchlist.repository.WatchlistAuditStore;
+import com.kkooman.lightworkflow.watchlist.audit.WatchlistSearchAudit;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
@@ -200,6 +202,31 @@ class WatchlistSearchServiceTest {
     @Test
     void returnsNoResultsForEmptyRequest() {
         assertThat(service.search(new WatchlistSearchRequest(null, null, null, null, null, null, null, null))).isEmpty();
+    }
+
+    @Test
+    void writesPrivacySafeAuditRecordForSearch() {
+        InMemoryAuditStore auditStore = new InMemoryAuditStore();
+        WatchlistSearchProperties properties = new WatchlistSearchProperties();
+        properties.setIndexPath("build/test-index/" + System.nanoTime());
+        WatchlistSearchService auditedService = new WatchlistSearchService(properties, store, auditStore);
+        auditedService.rebuild();
+
+        auditedService.search(new WatchlistSearchRequest("홍길동", null, null, null, null, null, null, null));
+
+        assertThat(auditStore.audit.requestedFieldCount()).isEqualTo(1);
+        assertThat(auditStore.audit.resultCount()).isGreaterThan(0);
+        assertThat(auditStore.audit.requestHash()).hasSize(64).doesNotContain("홍길동");
+    }
+
+    private static class InMemoryAuditStore implements WatchlistAuditStore {
+        private WatchlistSearchAudit audit;
+
+        @Override
+        public int save(WatchlistSearchAudit audit) {
+            this.audit = audit;
+            return 1;
+        }
     }
 
     @Test

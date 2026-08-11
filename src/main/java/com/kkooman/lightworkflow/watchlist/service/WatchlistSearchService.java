@@ -3,6 +3,9 @@ package com.kkooman.lightworkflow.watchlist.service;
 import com.kkooman.lightworkflow.watchlist.api.WatchlistSearchRequest;
 import com.kkooman.lightworkflow.watchlist.api.WatchlistSearchResult;
 import com.kkooman.lightworkflow.watchlist.api.WatchlistRiskLevel;
+import com.kkooman.lightworkflow.watchlist.api.WatchlistIndexStatus;
+import com.kkooman.lightworkflow.watchlist.audit.WatchlistSearchAudit;
+import com.kkooman.lightworkflow.watchlist.repository.WatchlistAuditStore;
 import com.kkooman.lightworkflow.watchlist.config.WatchlistSearchProperties;
 import com.kkooman.lightworkflow.watchlist.domain.WatchlistEntry;
 import java.io.IOException;
@@ -11,6 +14,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.time.OffsetDateTime;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.apache.lucene.analysis.Analyzer;
@@ -37,6 +43,7 @@ import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,17 +61,32 @@ public class WatchlistSearchService {
             Map.of("english-name", new StandardAnalyzer(), "aka", new StandardAnalyzer()));
     private final WatchlistSearchProperties properties;
     private final com.kkooman.lightworkflow.watchlist.repository.WatchlistEntryStore entryStore;
+    private final WatchlistAuditStore auditStore;
+    private volatile String indexState = "READY";
+    private volatile long indexedDocumentCount;
+    private volatile OffsetDateTime lastRebuiltAt;
+    private volatile OffsetDateTime lastSyncedAt;
 
+    @Autowired
     public WatchlistSearchService(
             WatchlistSearchProperties properties,
             com.kkooman.lightworkflow.watchlist.repository.WatchlistEntryStore entryStore) {
+        this(properties, entryStore, null);
+    }
+
+    public WatchlistSearchService(
+            WatchlistSearchProperties properties,
+            com.kkooman.lightworkflow.watchlist.repository.WatchlistEntryStore entryStore,
+            WatchlistAuditStore auditStore) {
         this.properties = properties;
         this.entryStore = entryStore;
+        this.auditStore = auditStore;
             try {
                 Files.createDirectories(Path.of(properties.getIndexPath()));
                 this.directory = FSDirectory.open(Path.of(properties.getIndexPath()));
                 try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(textAnalyzer))) {
                 writer.commit();
+                    indexedDocumentCount = writer.getDocStats().numDocs;
                 }
             } catch (IOException exception) {
                 throw new IllegalStateException("Watchlist index could not be initialized", exception);
@@ -76,6 +98,8 @@ public class WatchlistSearchService {
             writer.updateDocument(new Term("id", entry.id()), toDocument(entry));
             writer.commit();
             entryStore.save(entry);
+            indexedDocumentCount = countDocuments();
+            lastSyncedAt = OffsetDateTime.now();
         } catch (IOException exception) {
             throw new IllegalStateException("Watchlist entry could not be indexed: " + entry.id(), exception);
         }
@@ -86,6 +110,8 @@ public class WatchlistSearchService {
             writer.deleteDocuments(new Term("id", id));
             writer.commit();
             entryStore.delete(id);
+            indexedDocumentCount = countDocuments();
+            lastSyncedAt = OffsetDateTime.now();
         } catch (IOException exception) {
             throw new IllegalStateException("Watchlist entry could not be deleted: " + id, exception);
         }
@@ -99,10 +125,26 @@ public class WatchlistSearchService {
                 writer.addDocument(toDocument(entry));
             }
             writer.commit();
+            indexedDocumentCount = entries.size();
+            lastRebuiltAt = OffsetDateTime.now();
+            lastSyncedAt = lastRebuiltAt;
             return entries.size();
         } catch (IOException exception) {
             throw new IllegalStateException("Watchlist index rebuild failed", exception);
         }
+    }
+
+    public synchronized int sync(List<String> ids) {
+            List<WatchlistEntry> entries = entryStore.findByIds(ids);
+            for (WatchlistEntry entry : entries) {
+                indexOnly(entry);
+            }
+            lastSyncedAt = OffsetDateTime.now();
+            return entries.size();
+        }
+
+    public WatchlistIndexStatus status() {
+            return new WatchlistIndexStatus(indexState, indexedDocumentCount, lastRebuiltAt, lastSyncedAt);
     }
 
     public List<WatchlistSearchResult> search(WatchlistSearchRequest request) {
@@ -140,11 +182,51 @@ public class WatchlistSearchService {
             }
             log.info("Watchlist search completed: requestedFields={}, candidateCount={}",
                     requestedFieldCount(request), results.size());
+            saveAudit(request, results.size());
             return results.stream()
                     .sorted(Comparator.comparingDouble((WatchlistSearchResult result) -> result.score()).reversed())
                     .toList();
         } catch (IOException exception) {
             throw new IllegalStateException("Watchlist search failed", exception);
+        }
+    }
+
+    private void indexOnly(WatchlistEntry entry) {
+            try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(textAnalyzer))) {
+                writer.updateDocument(new Term("id", entry.id()), toDocument(entry));
+                writer.commit();
+                indexedDocumentCount = countDocuments();
+            } catch (IOException exception) {
+                throw new IllegalStateException("Watchlist entry could not be indexed: " + entry.id(), exception);
+            }
+        }
+
+    private long countDocuments() {
+            try (DirectoryReader reader = DirectoryReader.open(directory)) {
+                return reader.numDocs();
+            } catch (IOException exception) {
+                throw new IllegalStateException("Watchlist index status could not be read", exception);
+            }
+        }
+
+    private void saveAudit(WatchlistSearchRequest request, int resultCount) {
+            if (auditStore != null) {
+                auditStore.save(new WatchlistSearchAudit(
+                        OffsetDateTime.now(), requestedFieldCount(request), resultCount, hashRequest(request)));
+            }
+        }
+
+    private String hashRequest(WatchlistSearchRequest request) {
+            try {
+                byte[] digest = MessageDigest.getInstance("SHA-256")
+                        .digest(String.join("|", request.values()).getBytes(StandardCharsets.UTF_8));
+                StringBuilder result = new StringBuilder();
+                for (byte value : digest) {
+                    result.append(String.format("%02x", value));
+                }
+                return result.toString();
+            } catch (java.security.NoSuchAlgorithmException exception) {
+                throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 
