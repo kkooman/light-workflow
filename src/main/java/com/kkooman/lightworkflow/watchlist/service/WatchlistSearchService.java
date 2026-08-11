@@ -10,7 +10,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.cjk.CJKAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -32,8 +33,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.BoostQuery;
-import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -43,27 +44,34 @@ public class WatchlistSearchService {
             "residence", "aka", "gender", "listing-reason");
     private static final List<String> ANALYZED_FIELDS = List.of("korean-name", "english-name", "aka", "listing-reason");
 
-    private final Directory directory = new ByteBuffersDirectory();
+    private final Directory directory;
     private final Analyzer textAnalyzer = new PerFieldAnalyzerWrapper(
             new CJKAnalyzer(),
             Map.of("english-name", new StandardAnalyzer(), "aka", new StandardAnalyzer()));
     private final WatchlistSearchProperties properties;
-    private final Map<String, WatchlistEntry> entries = new ConcurrentHashMap<>();
+    private final com.kkooman.lightworkflow.watchlist.repository.WatchlistEntryStore entryStore;
 
-    public WatchlistSearchService(WatchlistSearchProperties properties) {
+    public WatchlistSearchService(
+            WatchlistSearchProperties properties,
+            com.kkooman.lightworkflow.watchlist.repository.WatchlistEntryStore entryStore) {
         this.properties = properties;
-        try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(textAnalyzer))) {
-            writer.commit();
-        } catch (IOException exception) {
-            throw new IllegalStateException("Watchlist index could not be initialized", exception);
-        }
+        this.entryStore = entryStore;
+            try {
+                Files.createDirectories(Path.of(properties.getIndexPath()));
+                this.directory = FSDirectory.open(Path.of(properties.getIndexPath()));
+                try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(textAnalyzer))) {
+                writer.commit();
+                }
+            } catch (IOException exception) {
+                throw new IllegalStateException("Watchlist index could not be initialized", exception);
+            }
     }
 
     public synchronized void upsert(WatchlistEntry entry) {
         try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(textAnalyzer))) {
             writer.updateDocument(new Term("id", entry.id()), toDocument(entry));
             writer.commit();
-            entries.put(entry.id(), entry);
+            entryStore.save(entry);
         } catch (IOException exception) {
             throw new IllegalStateException("Watchlist entry could not be indexed: " + entry.id(), exception);
         }
@@ -73,9 +81,23 @@ public class WatchlistSearchService {
         try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(textAnalyzer))) {
             writer.deleteDocuments(new Term("id", id));
             writer.commit();
-            entries.remove(id);
+            entryStore.delete(id);
         } catch (IOException exception) {
             throw new IllegalStateException("Watchlist entry could not be deleted: " + id, exception);
+        }
+    }
+
+    public synchronized int rebuild() {
+        List<WatchlistEntry> entries = entryStore.findAll();
+        try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(textAnalyzer))) {
+            writer.deleteAll();
+            for (WatchlistEntry entry : entries) {
+                writer.addDocument(toDocument(entry));
+            }
+            writer.commit();
+            return entries.size();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Watchlist index rebuild failed", exception);
         }
     }
 
@@ -89,14 +111,25 @@ public class WatchlistSearchService {
             ScoreDoc[] hits = searcher.search(query, 100).scoreDocs;
             float highestScore = hits.length == 0 || hits[0].score <= 0 ? 1 : hits[0].score;
             List<WatchlistSearchResult> results = new ArrayList<>();
+            List<String> ids = new ArrayList<>();
             for (ScoreDoc hit : hits) {
                 if (hit.score <= 0) {
                     continue;
                 }
                 String id = searcher.storedFields().document(hit.doc).get("id");
-                WatchlistEntry entry = entries.get(id);
-                if (entry != null) {
-                    results.add(new WatchlistSearchResult(entry, Math.min(100, hit.score / highestScore * 100)));
+                ids.add(id);
+            }
+            Map<String, WatchlistEntry> entries = new java.util.HashMap<>();
+            for (WatchlistEntry entry : entryStore.findByIds(ids)) {
+                entries.put(entry.id(), entry);
+            }
+            for (ScoreDoc hit : hits) {
+                if (hit.score > 0) {
+                    String id = searcher.storedFields().document(hit.doc).get("id");
+                    WatchlistEntry entry = entries.get(id);
+                    if (entry != null) {
+                        results.add(new WatchlistSearchResult(entry, Math.min(100, hit.score / highestScore * 100)));
+                    }
                 }
             }
             return results.stream()
@@ -121,7 +154,7 @@ public class WatchlistSearchService {
             if (ANALYZED_FIELDS.contains(field)) {
                 fieldQuery = analyzedFuzzyQuery(field, normalized);
             } else {
-                fieldQuery = new FuzzyQuery(new Term(field, normalized), 1);
+                fieldQuery = new TermQuery(new Term(field, normalized));
             }
             float weight = properties.getFieldWeights().getOrDefault(field, 1F);
             query.add(new BoostQuery(fieldQuery, weight), BooleanClause.Occur.SHOULD);

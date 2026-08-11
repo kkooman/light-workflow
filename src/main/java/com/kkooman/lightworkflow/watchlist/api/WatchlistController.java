@@ -38,4 +38,9 @@ public class WatchlistController {
     public List<WatchlistSearchResult> search(@RequestBody WatchlistSearchRequest request) {
         return searchService.search(request);
     }
+
+    @PostMapping("/rebuild")
+    public ResponseEntity<Integer> rebuild() {
+        return ResponseEntity.ok(searchService.rebuild());
+    }
 }

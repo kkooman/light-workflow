@@ -18,6 +18,7 @@ mybatis:
 
 watchlist:
   search:
+    index-path: ${WATCHLIST_INDEX_PATH:./data/lucene/watchlist}
     field-weights:
       korean-name: 30
       english-name: 25

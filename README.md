@@ -30,8 +30,20 @@ MyBatis XML 매퍼는 `src/main/resources/mapper` 아래에 두며,
 
 ## Watchlist 검색
 
-Watchlist 데이터는 현재 애플리케이션 메모리의 Lucene 인덱스에 저장됩니다.
-운영 환경에서는 데이터 저장소와 인덱스 재구축 작업을 연결해야 합니다.
+Watchlist 원천 데이터는 DB에서 조회하고, Lucene 인덱스는
+`WATCHLIST_INDEX_PATH`로 지정한 파일 시스템 경로에 영속 저장합니다.
+여러 서버가 같은 인덱스를 사용하려면 해당 경로가 모든 서버에서 접근 가능한
+공유 파일 시스템이어야 합니다. Lucene의 파일 잠금으로 동시 쓰기는 보호되지만,
+대규모 운영에서는 색인 갱신을 한 대의 전용 작업 노드로 단일화하는 것을 권장합니다.
+
+기존 DB 데이터를 인덱싱하거나 전체 재동기화할 때는 다음 API를 호출합니다.
+
+```text
+POST /api/watchlist/rebuild
+```
+
+DB Mapper는 `watchlist_entry` 테이블과 다음 컬럼을 기준으로 작성되어 있으므로,
+실제 AML 스키마가 다르면 `WatchlistEntryMapper.xml`의 SQL을 맞춰야 합니다.
 
 ```bash
 curl -X POST http://localhost:8080/api/watchlist/entries \
