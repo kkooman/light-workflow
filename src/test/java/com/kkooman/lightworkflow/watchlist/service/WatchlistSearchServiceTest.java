@@ -1,6 +1,7 @@
 package com.kkooman.lightworkflow.watchlist.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.kkooman.lightworkflow.watchlist.api.WatchlistSearchRequest;
 import com.kkooman.lightworkflow.watchlist.config.WatchlistSearchProperties;
@@ -11,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.kkooman.lightworkflow.watchlist.repository.WatchlistEntryStore;
 import com.kkooman.lightworkflow.watchlist.repository.WatchlistAuditStore;
 import com.kkooman.lightworkflow.watchlist.audit.WatchlistSearchAudit;
+import com.kkooman.lightworkflow.watchlist.api.WatchlistIndexStatus;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
@@ -202,6 +204,56 @@ class WatchlistSearchServiceTest {
     @Test
     void returnsNoResultsForEmptyRequest() {
         assertThat(service.search(new WatchlistSearchRequest(null, null, null, null, null, null, null, null))).isEmpty();
+    }
+
+    @Test
+    void reportsIndexLifecycleStatus() {
+        WatchlistIndexStatus initial = service.status();
+        assertThat(initial.state()).isEqualTo("READY");
+        assertThat(initial.indexedDocumentCount()).isEqualTo(2);
+        assertThat(initial.lastSyncedAt()).isNotNull();
+        assertThat(initial.lastRebuiltAt()).isNull();
+
+        service.rebuild();
+
+        WatchlistIndexStatus rebuilt = service.status();
+        assertThat(rebuilt.indexedDocumentCount()).isEqualTo(2);
+        assertThat(rebuilt.lastRebuiltAt()).isNotNull();
+        assertThat(rebuilt.lastSyncedAt()).isEqualTo(rebuilt.lastRebuiltAt());
+    }
+
+    @Test
+    void incrementallySyncsOnlyRequestedDatabaseRows() {
+        store.entries.put("wl-1", new WatchlistEntry(
+                "wl-1", "박영희", "Younghee Park", "1980-01-02",
+                "KR", "대한민국", List.of(), "F", "변경"));
+
+        assertThat(service.sync(List.of("wl-1"))).isEqualTo(1);
+        assertThat(service.search(new WatchlistSearchRequest("박영희", null, null, null, null, null, null, null)))
+                .extracting(result -> result.entry().id()).containsExactly("wl-1");
+        assertThat(service.search(new WatchlistSearchRequest("홍길동", null, null, null, null, null, null, null)))
+                .isEmpty();
+    }
+
+    @Test
+    void ignoresUnknownIdsDuringIncrementalSync() {
+        assertThat(service.sync(List.of("missing-id"))).isZero();
+        assertThat(service.status().indexedDocumentCount()).isEqualTo(2);
+    }
+
+    @Test
+    void auditStoreFailureIsNotSilentlyIgnored() {
+        WatchlistSearchProperties properties = new WatchlistSearchProperties();
+        properties.setIndexPath("build/test-index/" + System.nanoTime());
+        WatchlistSearchService auditedService = new WatchlistSearchService(properties, store, audit -> {
+            throw new IllegalStateException("audit unavailable");
+        });
+        auditedService.rebuild();
+
+        assertThatThrownBy(() -> auditedService.search(
+                new WatchlistSearchRequest("홍길동", null, null, null, null, null, null, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("audit unavailable");
     }
 
     @Test
