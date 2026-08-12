@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,11 +41,13 @@ public class WatchlistController {
     }
 
     @PostMapping("/rebuild")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     public ResponseEntity<Integer> rebuild() {
         return ResponseEntity.ok(searchService.rebuild());
     }
 
     @PostMapping("/sync")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     public ResponseEntity<Integer> sync(@RequestBody WatchlistSyncRequest request) {
         return ResponseEntity.ok(searchService.sync(request.ids()));
     }
