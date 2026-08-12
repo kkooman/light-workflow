@@ -1,14 +1,26 @@
 spring:
   application:
     name: light-workflow
+  jackson:
+    time-zone: Asia/Seoul
+  mvc:
+    time-zone: Asia/Seoul
   datasource:
     url: jdbc:h2:mem:lightworkflow;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
     username: sa
     password:
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
   h2:
     console:
       enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
 
 mybatis:
   mapper-locations: classpath:/mapper/**/*.xml
