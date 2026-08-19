@@ -43,5 +43,9 @@ watchlist:
       gender: 3
       listing-reason: 3
 
+lightworkflow:
+  maintenance:
+    file-path: ${MAINTENANCE_FILE_PATH:/tmp/lightworkflow-maintenance.marker}
+
 server:
   port: 8080
