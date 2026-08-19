@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: light-workflow
+  jackson:
+    time-zone: Asia/Seoul
+  mvc:
+    time-zone: Asia/Seoul
+  datasource:
+    url: jdbc:h2:mem:lightworkflow;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
+  h2:
+    console:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+mybatis:
+  mapper-locations: classpath:/mapper/**/*.xml
+  type-aliases-package: com.kkooman.lightworkflow
+  configuration:
+    map-underscore-to-camel-case: true
+
+watchlist:
+  search:
+    index-path: ${WATCHLIST_INDEX_PATH:./data/lucene/watchlist}
+    high-risk-threshold: 90
+    review-threshold: 70
+    field-weights:
+      korean-name: 30
+      english-name: 25
+      date-of-birth: 15
+      country: 8
+      residence: 8
+      aka: 8
+      gender: 3
+      listing-reason: 3
+
+server:
+  port: 8080

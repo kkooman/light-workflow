@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kkooman.lightworkflow.watchlist.repository.WatchlistEntryMapper">
+    <resultMap id="watchlistEntryMap" type="com.kkooman.lightworkflow.watchlist.domain.WatchlistEntry">
+        <id property="id" column="id"/>
+        <result property="koreanName" column="korean_name"/>
+        <result property="englishName" column="english_name"/>
+        <result property="dateOfBirth" column="date_of_birth"/>
+        <result property="country" column="country"/>
+        <result property="residence" column="residence"/>
+        <result property="aka" column="aka"
+                typeHandler="com.kkooman.lightworkflow.watchlist.repository.AkaTypeHandler"/>
+        <result property="gender" column="gender"/>
+        <result property="listingReason" column="listing_reason"/>
+    </resultMap>
+    <!-- Adapt table/column names to the existing AML watchlist schema. -->
+    <select id="findByIds" resultMap="watchlistEntryMap">
+        SELECT id, korean_name, english_name, date_of_birth, country, residence,
+               aka, gender, listing_reason
+        FROM watchlist_entry
+        WHERE id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="findAll" resultMap="watchlistEntryMap">
+        SELECT id, korean_name, english_name, date_of_birth, country, residence,
+               aka, gender, listing_reason
+        FROM watchlist_entry
+    </select>
+    <insert id="save">
+        MERGE INTO watchlist_entry
+        (id, korean_name, english_name, date_of_birth, country, residence, aka, gender, listing_reason)
+        VALUES
+        (#{id}, #{koreanName}, #{englishName}, #{dateOfBirth}, #{country}, #{residence},
+        #{aka, typeHandler=com.kkooman.lightworkflow.watchlist.repository.AkaTypeHandler},
+        #{gender}, #{listingReason})
+    </insert>
+    <delete id="delete">
+        DELETE FROM watchlist_entry WHERE id = #{id}
+    </delete>
+</mapper>
