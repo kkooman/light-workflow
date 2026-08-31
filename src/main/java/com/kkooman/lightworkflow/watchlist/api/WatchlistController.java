@@ -24,36 +24,36 @@ public class WatchlistController {
     }
 
     @PostMapping("/entries")
-    public ResponseEntity<Void> upsert(@Valid @RequestBody WatchlistEntry entry) {
+    public ResponseEntity<com.kkooman.lightworkflow.api.ApiResponse<Void>> upsert(@Valid @RequestBody WatchlistEntry entry) {
         searchService.upsert(entry);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(com.kkooman.lightworkflow.api.ApiResponse.success(null, "위험도 리스트 항목 저장 성공"));
     }
 
     @DeleteMapping("/entries/{id}")
-    public ResponseEntity<Void> delete(@PathVariable @NotBlank String id) {
+    public ResponseEntity<com.kkooman.lightworkflow.api.ApiResponse<Void>> delete(@PathVariable @NotBlank String id) {
         searchService.delete(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(com.kkooman.lightworkflow.api.ApiResponse.success(null, "위험도 리스트 항목 삭제 성공"));
     }
 
     @PostMapping("/search")
-    public List<WatchlistSearchResult> search(@RequestBody WatchlistSearchRequest request) {
-        return searchService.search(request);
+    public com.kkooman.lightworkflow.api.ApiResponse<List<WatchlistSearchResult>> search(@RequestBody WatchlistSearchRequest request) {
+        return com.kkooman.lightworkflow.api.ApiResponse.success(searchService.search(request), "검색 성공");
     }
 
     @PostMapping("/rebuild")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    public ResponseEntity<Integer> rebuild() {
-        return ResponseEntity.ok(searchService.rebuild());
+    public ResponseEntity<com.kkooman.lightworkflow.api.ApiResponse<Integer>> rebuild() {
+        return ResponseEntity.ok(com.kkooman.lightworkflow.api.ApiResponse.success(searchService.rebuild(), "인덱스 재구성 완료"));
     }
 
     @PostMapping("/sync")
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    public ResponseEntity<Integer> sync(@RequestBody WatchlistSyncRequest request) {
-        return ResponseEntity.ok(searchService.sync(request.ids()));
+    public ResponseEntity<com.kkooman.lightworkflow.api.ApiResponse<Integer>> sync(@RequestBody WatchlistSyncRequest request) {
+        return ResponseEntity.ok(com.kkooman.lightworkflow.api.ApiResponse.success(searchService.sync(request.ids()), "인덱스 동기화 완료"));
     }
 
     @org.springframework.web.bind.annotation.GetMapping("/index/status")
-    public WatchlistIndexStatus indexStatus() {
-        return searchService.status();
+    public com.kkooman.lightworkflow.api.ApiResponse<WatchlistIndexStatus> indexStatus() {
+        return com.kkooman.lightworkflow.api.ApiResponse.success(searchService.status(), "인덱스 상태 조회 성공");
     }
 }

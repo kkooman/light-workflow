@@ -28,7 +28,7 @@ class WatchlistControllerTest {
                 "wl-1", "홍길동", "Hong Gil Dong", null, null, null, List.of(), null, null);
 
         assertThat(controller.upsert(entry).getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(controller.delete("wl-1").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(controller.delete("wl-1").getStatusCode()).isEqualTo(HttpStatus.OK);
 
         verify(service).upsert(entry);
         verify(service).delete("wl-1");
@@ -46,10 +46,10 @@ class WatchlistControllerTest {
         when(service.sync(List.of("wl-1"))).thenReturn(1);
         when(service.status()).thenReturn(status);
 
-        assertThat(controller.search(request)).containsExactly(result);
-        assertThat(controller.rebuild().getBody()).isEqualTo(1);
-        assertThat(controller.sync(new WatchlistSyncRequest(List.of("wl-1"))).getBody()).isEqualTo(1);
-        assertThat(controller.indexStatus()).isEqualTo(status);
+        assertThat(controller.search(request).data()).containsExactly(result);
+        assertThat(controller.rebuild().getBody().data()).isEqualTo(1);
+        assertThat(controller.sync(new WatchlistSyncRequest(List.of("wl-1"))).getBody().data()).isEqualTo(1);
+        assertThat(controller.indexStatus().data()).isEqualTo(status);
 
         verify(service).search(request);
         verify(service).rebuild();

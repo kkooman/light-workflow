@@ -23,17 +23,19 @@ class CommonCodeControllerTest {
         mockMvc.perform(get("/api/common-codes"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
-                .andExpect(jsonPath("$.DisplayStatus[0].code").value("ACTIVE"))
-                .andExpect(jsonPath("$.DisplayStatus[0].label").value("활성"))
-                .andExpect(jsonPath("$.UserType[0].code").value("ADMIN"))
-                .andExpect(jsonPath("$.UserType[0].label").value("관리자"));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.DisplayStatus[0].code").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.DisplayStatus[0].label").value("활성"))
+                .andExpect(jsonPath("$.data.UserType[0].code").value("ADMIN"))
+                .andExpect(jsonPath("$.data.UserType[0].label").value("관리자"));
     }
 
     @Test
     void singleEnumEndpointReturnsValues() throws Exception {
         mockMvc.perform(get("/api/common-codes/DisplayStatus"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("ACTIVE"))
-                .andExpect(jsonPath("$[0].label").value("활성"));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].code").value("ACTIVE"))
+                .andExpect(jsonPath("$.data[0].label").value("활성"));
     }
 }

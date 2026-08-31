@@ -23,23 +23,23 @@ import java.util.TreeMap;
 public class CommonCodeController {
 
     @GetMapping("/common-codes")
-    public Map<String, List<Map<String, String>>> getAllCommonCodes() throws IOException, ClassNotFoundException {
+    public ApiResponse<Map<String, List<Map<String, String>>>> getAllCommonCodes() throws IOException, ClassNotFoundException {
         Map<String, List<Map<String, String>>> result = new TreeMap<>();
         for (Class<?> enumClass : findEnumClasses()) {
             result.put(enumClass.getSimpleName(), toCodeEntries(enumClass));
         }
-        return result;
+        return ApiResponse.success(result, "공통코드 목록 조회 성공");
     }
 
     @GetMapping("/common-codes/{enumName}")
-    public ResponseEntity<List<Map<String, String>>> getCommonCodes(@PathVariable String enumName)
+    public ResponseEntity<ApiResponse<List<Map<String, String>>>> getCommonCodes(@PathVariable String enumName)
             throws IOException, ClassNotFoundException {
         for (Class<?> enumClass : findEnumClasses()) {
             if (enumClass.getSimpleName().equalsIgnoreCase(enumName)) {
-                return ResponseEntity.ok(toCodeEntries(enumClass));
+                return ResponseEntity.ok(ApiResponse.success(toCodeEntries(enumClass), "공통코드 조회 성공"));
             }
         }
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.status(404).body(ApiResponse.fail("COMMON_CODE_NOT_FOUND", "요청한 공통코드를 찾을 수 없습니다."));
     }
 
     private List<Class<?>> findEnumClasses() throws IOException, ClassNotFoundException {

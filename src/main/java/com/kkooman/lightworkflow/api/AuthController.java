@@ -30,16 +30,17 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest request) {
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.username(), request.password()));
 
             String token = tokenProvider.createToken(authentication);
             tokenStore.store(token);
-            return ResponseEntity.ok(new AuthResponse(token));
+            return ResponseEntity.ok(ApiResponse.success(new AuthResponse(token), "로그인 성공"));
         } catch (AuthenticationException ex) {
-            return ResponseEntity.status(401).build();
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.fail("AUTH_FAILED", "아이디 또는 비밀번호가 올바르지 않습니다."));
         }
     }
 }
