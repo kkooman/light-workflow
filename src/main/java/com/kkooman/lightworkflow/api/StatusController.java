@@ -33,4 +33,25 @@ public class StatusController {
 
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(body);
     }
+
+    @GetMapping(value = "/api/health", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> health() throws IOException {
+        boolean maintenance = Files.exists(Paths.get(maintenanceFilePath));
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("status", maintenance ? "MAINTENANCE" : "UP");
+        data.put("maintenance", maintenance);
+        data.put("service", "light-workflow");
+
+        if (maintenance) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ApiResponse.fail("MAINTENANCE", "서비스 점검 중입니다."));
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(data, "서비스 정상 상태"));
+    }
+
+    @GetMapping(value = "/api/status", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> statusJson() throws IOException {
+        return health();
+    }
 }
