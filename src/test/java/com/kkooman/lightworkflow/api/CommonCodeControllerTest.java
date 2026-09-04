@@ -38,4 +38,13 @@ class CommonCodeControllerTest {
                 .andExpect(jsonPath("$.data[0].code").value("ACTIVE"))
                 .andExpect(jsonPath("$.data[0].label").value("활성"));
     }
+
+    @Test
+    void unknownEnumEndpointReturnsCommonCodeErrorResponse() throws Exception {
+        mockMvc.perform(get("/api/common-codes/UnknownCode"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("COMMON_CODE_NOT_FOUND"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
 }
