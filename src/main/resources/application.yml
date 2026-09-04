@@ -6,12 +6,20 @@ spring:
   mvc:
     time-zone: Asia/Seoul
   datasource:
-    url: jdbc:h2:mem:lightworkflow;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-    hikari:
-      connection-init-sql: SET TIME ZONE 'UTC'
+    customer:
+      url: ${CUSTOMER_DB_URL:jdbc:h2:mem:customerdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}
+      driver-class-name: ${CUSTOMER_DB_DRIVER:org.h2.Driver}
+      username: ${CUSTOMER_DB_USERNAME:sa}
+      password: ${CUSTOMER_DB_PASSWORD:}
+      hikari:
+        connection-init-sql: SET TIME ZONE 'UTC'
+    watchlist:
+      url: ${WATCHLIST_DB_URL:jdbc:h2:mem:watchlistdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}
+      driver-class-name: ${WATCHLIST_DB_DRIVER:org.h2.Driver}
+      username: ${WATCHLIST_DB_USERNAME:sa}
+      password: ${WATCHLIST_DB_PASSWORD:}
+      hikari:
+        connection-init-sql: SET TIME ZONE 'UTC'
   h2:
     console:
       enabled: true

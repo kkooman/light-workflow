@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kkooman.lightworkflow.watchlist.detection.WatchlistDetectionMapper">
+    <insert id="save">
+        INSERT INTO watchlist_detection
+            (detection_id, customer_id, watchlist_entry_id, score, risk_level,
+             matched_fields, submitted_by, detected_at)
+        VALUES
+            (#{detectionId}, #{customerId}, #{watchlistEntryId}, #{score}, #{riskLevel},
+             #{matchedFields, typeHandler=com.kkooman.lightworkflow.watchlist.repository.AkaTypeHandler},
+             #{submittedBy}, #{detectedAt})
+    </insert>
+</mapper>
