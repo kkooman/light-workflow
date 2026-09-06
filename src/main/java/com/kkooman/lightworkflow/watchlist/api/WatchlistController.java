@@ -6,16 +6,18 @@ import com.kkooman.lightworkflow.watchlist.approval.ApprovalService;
 import com.kkooman.lightworkflow.watchlist.detection.WatchlistDetectionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.security.Principal;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/watchlist")
@@ -28,7 +30,7 @@ public class WatchlistController {
         this(searchService, null, null);
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public WatchlistController(WatchlistSearchService searchService,
             WatchlistDetectionService detectionService, ApprovalService approvalService) {
         this.searchService = searchService;
@@ -79,7 +81,7 @@ public class WatchlistController {
         return ResponseEntity.ok(com.kkooman.lightworkflow.api.ApiResponse.success(searchService.sync(request.ids()), "인덱스 동기화 완료"));
     }
 
-    @org.springframework.web.bind.annotation.GetMapping("/index/status")
+    @GetMapping("/index/status")
     public com.kkooman.lightworkflow.api.ApiResponse<WatchlistIndexStatus> indexStatus() {
         return com.kkooman.lightworkflow.api.ApiResponse.success(searchService.status(), "인덱스 상태 조회 성공");
     }
