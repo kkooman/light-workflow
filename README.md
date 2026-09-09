@@ -19,6 +19,15 @@ Java 21, Gradle 8, Spring Boot, MyBatis 기반의 기본 프로젝트입니다.
 애플리케이션은 `http://localhost:8080`에서 실행됩니다. 개발 중 H2 콘솔은
 `http://localhost:8080/h2-console`에서 사용할 수 있습니다.
 
+## API 문서
+
+전체 엔드포인트, 인증 방법, 공통 응답 형식과 호출 예시는
+[API_GUIDE.md](./API_GUIDE.md)를 참고하세요.
+
+실행 중인 애플리케이션에서는 Swagger UI
+(`http://localhost:8080/swagger-ui.html`)와 OpenAPI JSON
+(`http://localhost:8080/v3/api-docs`)도 제공합니다.
+
 ## 검증
 
 ```bash
